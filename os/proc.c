@@ -2,6 +2,7 @@
 #include "defs.h"
 #include "loader.h"
 #include "trap.h"
+#include "timer.h"
 
 struct proc pool[NPROC];
 char kstack[NPROC][PAGE_SIZE];
@@ -34,6 +35,9 @@ void proc_init(void)
 		/*
 		* LAB1: you may need to initialize your new fields of proc here
 		*/
+		p->start_cycle = 0;
+		p->started = 0;
+		memset(p->syscall_times, 0, sizeof(p->syscall_times));
 	}
 	idle.kstack = (uint64)boot_stack_top;
 	idle.pid = 0;
@@ -67,6 +71,11 @@ found:
 	memset((void *)p->kstack, 0, PAGE_SIZE);
 	p->context.ra = (uint64)usertrapret;
 	p->context.sp = p->kstack + PAGE_SIZE;
+
+    p->start_cycle = 0;
+    p->started = 0;
+    memset(p->syscall_times, 0, sizeof(p->syscall_times));
+
 	return p;
 }
 
@@ -75,6 +84,7 @@ found:
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+// schedules and runs processes + starts timing exactly once
 void scheduler(void)
 {
 	struct proc *p;
@@ -84,9 +94,14 @@ void scheduler(void)
 				/*
 				* LAB1: you may need to init proc start time here
 				*/
-				p->state = RUNNING;
-				current_proc = p;
-				swtch(&idle.context, &p->context);
+				if (!p->started) {
+                    p->start_cycle = get_cycle();
+                    p->started = 1; // mark the process as started
+                }
+
+                p->state = RUNNING;
+                current_proc = p;
+                swtch(&idle.context, &p->context);
 			}
 		}
 	}

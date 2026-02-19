@@ -35,7 +35,7 @@ int load_app(int n, uint64 *info)
 	memmove((void *)BASE_ADDRESS + n * MAX_APP_SIZE, (void *)start, length);
 	return length;
 }
-
+// creates processes + loads apps + sets them RUNNABLE
 // load all apps and init the corresponding `proc` structure.
 int run_all_app()
 {
@@ -51,6 +51,9 @@ int run_all_app()
 		/*
 		* LAB1: you may need to initialize your new fields of proc here
 		*/
+		p->start_cycle = 0; // initialize start_cycle to 0, will be set when the process starts running
+		p->started = 0; 
+		memset(p->syscall_times, 0, sizeof(p->syscall_times)); 
 	}
 	return 0;
 }
