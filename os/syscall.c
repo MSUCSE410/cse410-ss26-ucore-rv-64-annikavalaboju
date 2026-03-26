@@ -37,7 +37,8 @@ uint64 sys_sched_yield()
 }
 
 // implemented sys_gettimeofday 
-
+// kernel implementation 
+// returns current time, use copyout to write to virtual address
 uint64 sys_gettimeofday(TimeVal *val, int _tz)
 {
 	struct proc *p = curr_proc();
