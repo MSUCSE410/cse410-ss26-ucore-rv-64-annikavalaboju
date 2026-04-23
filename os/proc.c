@@ -58,8 +58,7 @@ struct proc *fetch_task()
 
 void add_task(struct proc *p)
 {
-	push_queue(&task_queue, p - pool);
-	debugf("add task %d(pid=%d) to task queue\n", p - pool, p->pid);
+	(void)p;
 }
 
 // Look in the process table for an UNUSED proc.
@@ -83,6 +82,12 @@ found:
 	p->max_page = 0;
 	p->parent = NULL;
 	p->exit_code = 0;
+
+	// initialized scheduling data for every new process
+	p->priority = 16;
+	p->stride = 0;
+	p->pass = BIG_STRIDE / p->priority;
+
 	p->pagetable = uvmcreate((uint64)p->trapframe);
 	memset(&p->context, 0, sizeof(p->context));
 	memset((void *)p->kstack, 0, KSTACK_SIZE);
@@ -97,31 +102,35 @@ found:
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
-void scheduler()
+void scheduler() // stride scheduling 
 {
 	struct proc *p;
+	struct proc *best;
+
 	for (;;) {
-		/*int has_proc = 0;
+		best = NULL; // scans all runnable processes
+
 		for (p = pool; p < &pool[NPROC]; p++) {
-			if (p->state == RUNNABLE) {
-				has_proc = 1;
-				tracef("swtich to proc %d", p - pool);
-				p->state = RUNNING;
-				current_proc = p;
-				swtch(&idle.context, &p->context);
+			if (p->state == RUNNABLE) { // select the one with smallest stride + run process
+				if (best == NULL || p->stride < best->stride || 
+				    (p->stride == best->stride && p->pid < best->pid)) {
+					best = p; 
+				}
 			}
 		}
-		if(has_proc == 0) {
-			panic("all app are over!\n");
-		}*/
-		p = fetch_task();
-		if (p == NULL) {
+
+		if (best == NULL) {
 			panic("all app are over!\n");
 		}
-		tracef("swtich to proc %d", p - pool);
-		p->state = RUNNING;
-		current_proc = p;
-		swtch(&idle.context, &p->context);
+
+		tracef("switch to proc %d", best - pool);
+		best->state = RUNNING;
+		current_proc = best;
+
+		// after this process is selected, increase its stride by pass value
+		best->stride += best->pass;
+
+		swtch(&idle.context, &best->context);
 	}
 }
 
@@ -198,6 +207,21 @@ int exec(char *name)
 	p->max_page = 0;
 	loader(id, p);
 	return 0;
+}
+
+// initialized scheduling for every new process
+int set_priority(long long prio)
+{
+	struct proc *p = curr_proc();
+
+	if (prio < 2) {  // if priority is too high, return -1
+		return -1;
+	}
+
+	p->priority = (int)prio;
+	p->pass = BIG_STRIDE / p->priority;
+
+	return p->priority; // return new priority on success
 }
 
 int wait(int pid, int *code)

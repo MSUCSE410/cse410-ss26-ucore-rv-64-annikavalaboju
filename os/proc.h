@@ -7,6 +7,7 @@
 
 #define NPROC (512)
 #define FD_BUFFER_SIZE (16)
+#define BIG_STRIDE (1000000ULL) // added constand for STRIDE scheduling
 
 struct file;
 
@@ -45,6 +46,11 @@ struct proc {
 	struct proc *parent; // Parent process
 	uint64 exit_code;
 	struct file *files[FD_BUFFER_SIZE];
+
+	// extended process control block
+	int priority;        // stride scheduling priority
+	uint64 stride;       // current accumulated stride
+	uint64 pass;         // BIG_STRIDE / priority
 };
 
 int cpuid();
@@ -63,5 +69,8 @@ struct proc *allocproc();
 int fdalloc(struct file *);
 // swtch.S
 void swtch(struct context *, struct context *);
+
+int set_priority(long long prio);
+
 
 #endif // PROC_H

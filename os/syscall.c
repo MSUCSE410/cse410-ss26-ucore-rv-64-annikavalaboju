@@ -92,15 +92,42 @@ uint64 sys_wait(int pid, uint64 va)
 	return wait(pid, code);
 }
 
+// implemented syspawn function 
 uint64 sys_spawn(uint64 va)
 {
-	// TODO: your job is to complete the sys call
-	return -1;
+	struct proc *parent = curr_proc(); // read requested program name from user space
+	struct proc *np; // create new child process
+	char name[200];
+	int id; 
+    // execute program in child process
+	if (copyinstr(parent->pagetable, name, va, 200) < 0) {
+		return -1;
+	}
+
+    id = get_id_by_name(name);
+	if (id < 0) {
+		return -1;
+	}
+
+	np = allocproc();
+	if (np == 0) {
+		return -1; // return -1 on failure
+	}
+
+	np->parent = parent;
+	np->max_page = 0;
+
+	loader(id, np);
+
+	np->state = RUNNABLE; // marks runnable
+	add_task(np);
+
+	return np->pid; // return child's pid on success
 }
 
+// implement set priority
 uint64 sys_set_priority(long long prio){
-    // TODO: your job is to complete the sys call
-    return -1;
+    return set_priority(prio); // return set_priority
 }
 
 
@@ -147,6 +174,9 @@ void syscall()
 		break;
 	case SYS_spawn:
 		ret = sys_spawn(args[0]);
+		break;
+    case SYS_set_priority: // added set_priority syscall
+		ret = sys_set_priority(args[0]);
 		break;
 	default:
 		ret = -1;
